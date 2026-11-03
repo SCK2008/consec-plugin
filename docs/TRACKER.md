@@ -16,7 +16,7 @@ Status values: `todo` · `in-progress` · `blocked` · `review` · `done`
 | 0.6 | Git identity for commits | done | Saurav | SCK2008, GitHub noreply. No Cursor co-author |
 | 1 | Workspace scaffold + `getImageRef` | done | agent | Tests 3/3. Pinned to Pulse 1.54.3 |
 | 2 | `ConsecClient` + types | done | agent | 10 client tests. MSW 2, fetch called at request time |
-| 3 | `ConsecCard` | todo | | |
+| 3 | `ConsecCard` | done | agent | 8 card tests. Gate, counts, link, missing annotation |
 | 4 | `ConsecPage` | todo | | |
 | 5 | Legacy wiring + dev harness | todo | | |
 | 6 | New frontend system `./alpha` | todo | | Uses `backstage.io@plugin-new-frontend-system-support` skill |
@@ -28,7 +28,7 @@ Status values: `todo` · `in-progress` · `blocked` · `review` · `done`
 | Risk | Covered in | Status |
 |------|-----------|--------|
 | Proxy not configured (404 HTML) → error, not "not scanned" | Task 2 | done |
-| Go zero time `last_checked_at` → "Never checked" | Tasks 2, 3 | done in client; card copy in Task 3 |
+| Go zero time `last_checked_at` → "Never checked" | Tasks 2, 3 | done |
 | References with `/`, `:`, `@sha256:` encoded once | Task 2 | done |
 | One failing lookup doesn't break overview page | Task 4 | todo |
 | Whitespace-only annotation → missing-annotation state | Task 1 | done |
@@ -46,3 +46,4 @@ Status values: `todo` · `in-progress` · `blocked` · `review` · `done`
 - 2026-11-03: Spec and plan approved. Execution is native on branch feat/consec-backstage-plugin.
 - 2026-11-03: Task 1 done. `getImageRef` trims and rejects blank annotations. Yarn needed a local lockfile because `C:\Users\skalal\package.json` exists.
 - 2026-11-03: Task 2 done. Client maps lookup rows, treats JSON 404 as not scanned, and throws on HTML 404 and 401.
+- 2026-11-03: Task 3 done. Entity card shows gate, severity counts, and View in ConSec.

@@ -6,6 +6,7 @@
     "plugins/*/config.d.ts"
   ],
   "compilerOptions": {
+    "jsx": "react-jsx",
     "outDir": "dist-types",
     "rootDir": "."
   }
