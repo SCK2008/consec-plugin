@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   EmptyState,
   InfoCard,
@@ -18,7 +19,7 @@ import useAsync from 'react-use/esm/useAsync';
 import { ImageSummary, consecApiRef } from '../../api';
 import {
   CONSEC_IMAGE_REF_ANNOTATION,
-  getImageRef,
+  getEntityImages,
 } from '../../annotations';
 
 const useStyles = makeStyles(theme => ({
@@ -93,7 +94,8 @@ export const ConsecCard = (props: { variant?: InfoCardVariants }) => {
   const classes = useStyles();
   const { entity } = useEntity();
   const consecApi = useApi(consecApiRef);
-  const imageRef = getImageRef(entity);
+  const images = getEntityImages(entity);
+  const imageRef = images[0]?.reference;
   const { value, loading, error } = useAsync(
     async () => (imageRef ? consecApi.getImageSummary(imageRef) : undefined),
     [consecApi, imageRef],
@@ -160,6 +162,12 @@ export const ConsecCard = (props: { variant?: InfoCardVariants }) => {
         ))}
       </div>
       <Typography className={classes.meta}>{checked}</Typography>
+      {images.length > 1 && (
+        <Typography className={classes.meta}>
+          {images.length - 1} more {images.length === 2 ? 'image' : 'images'}{' '}
+          on the ConSec tab
+        </Typography>
+      )}
     </Card>
   );
 };

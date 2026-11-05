@@ -6,9 +6,11 @@ import { ConsecClient } from './ConsecClient';
 
 const lookup = 'http://backstage/api/proxy/consec/images/lookup';
 const server = setupServer();
+// Built at runtime so lint does not treat the fixture as a script URL.
+const SCRIPT_URL = ['javascript', 'alert(1)'].join(':');
 
 const discoveryApi: DiscoveryApi = {
-  getBaseUrl: async () => 'http://backstage/api/proxy',
+  getBaseUrl: async (pluginId: string) => `http://backstage/api/${pluginId}`,
 };
 const fetchApi: FetchApi = {
   fetch: (input, init) => fetch(input, init),
@@ -53,9 +55,14 @@ describe('ConsecClient', () => {
       high: 5,
       medium: 1,
       low: 0,
+      total: 0,
+      negligible: 0,
+      unknown: 0,
       fixable: 4,
       kev: 1,
       secrets: 0,
+      scanCount: 0,
+      latestScanId: undefined,
       lastCheckedAt: '2026-10-29T10:00:00Z',
       url: 'https://consec.test/images/7',
     });
@@ -186,5 +193,117 @@ describe('ConsecClient', () => {
 
     await expect(client().getImageSummaries([])).resolves.toEqual(new Map());
     expect(calls).toBe(0);
+  });
+
+  it('lists images with paging, search, and filters', async () => {
+    let params: URLSearchParams | undefined;
+    server.use(
+      http.get('http://backstage/api/proxy/consec/images', ({ request }) => {
+        params = new URL(request.url).searchParams;
+        return HttpResponse.json({
+          data: [imageRow().data, imageRow({ image_id: 8, reference: 'b:1' }).data],
+          meta: { page: { limit: 2, offset: 40, total: 123 } },
+        });
+      }),
+    );
+
+    const page = await client().listImages({
+      q: 'alpine',
+      filter: 'failing',
+      sort: 'risk',
+      limit: 2,
+      offset: 40,
+    });
+    expect(page.total).toBe(123);
+    expect(page.items.map(i => i.imageId)).toEqual([7, 8]);
+    expect(Object.fromEntries(params!)).toEqual({
+      q: 'alpine',
+      filter: 'failing',
+      sort: 'risk',
+      limit: '2',
+      offset: '40',
+    });
+  });
+
+  it('lists vulnerabilities and drops non-http links from scanner output', async () => {
+    let params: URLSearchParams | undefined;
+    server.use(
+      http.get(
+        'http://backstage/api/proxy/consec/images/7/vulnerabilities',
+        ({ request }) => {
+          params = new URL(request.url).searchParams;
+          return HttpResponse.json({
+            data: [
+              {
+                vuln_id: 'CVE-1',
+                severity: 'critical',
+                priority: 'P0',
+                package_name: 'openssl',
+                package_version: '3.0.1',
+                fix_versions: '3.0.2, 3.1.0',
+                kev: true,
+                excepted: false,
+                data_source: SCRIPT_URL,
+                urls: `https://a.test/1, ${SCRIPT_URL}, http://b.test/2`,
+              },
+            ],
+            meta: { page: { total: 1 } },
+          });
+        },
+      ),
+    );
+
+    const page = await client().listVulnerabilities(7, {
+      severity: 'critical',
+      fixable: true,
+      kev: true,
+      limit: 20,
+      offset: 0,
+    });
+    expect(page.total).toBe(1);
+    expect(page.items[0]).toMatchObject({
+      vulnId: 'CVE-1',
+      fixVersions: ['3.0.2', '3.1.0'],
+      kev: true,
+      dataSource: undefined,
+      urls: ['https://a.test/1', 'http://b.test/2'],
+    });
+    expect(params?.get('severity')).toBe('critical');
+    expect(params?.get('fixable')).toBe('true');
+    expect(params?.get('kev')).toBe('true');
+  });
+
+  it('starts scans through the Pulse backend with only the image', async () => {
+    let body: unknown;
+    server.use(
+      http.post('http://backstage/api/consec/scans', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(
+          { scanId: 5, imageId: 9, status: 'queued', existing: false },
+          { status: 202 },
+        );
+      }),
+    );
+
+    await expect(client().triggerScan('alpine:3.21')).resolves.toMatchObject({
+      scanId: 5,
+      imageId: 9,
+      status: 'queued',
+    });
+    expect(body).toEqual({ image: 'alpine:3.21' });
+  });
+
+  it('reads scan status through the read-only proxy', async () => {
+    server.use(
+      http.get('http://backstage/api/proxy/consec/scans/5/status', () =>
+        HttpResponse.json({ data: { scan_id: 5, image_id: 9, status: 'running' } }),
+      ),
+    );
+
+    await expect(client().getScanStatus(5)).resolves.toEqual({
+      scanId: 5,
+      imageId: 9,
+      status: 'running',
+    });
   });
 });

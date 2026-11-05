@@ -16,6 +16,19 @@ export const EntityConsecCard = consecPlugin.provide(
 );
 
 /** @public */
+export const EntityConsecContent = consecPlugin.provide(
+  createComponentExtension({
+    name: 'EntityConsecContent',
+    component: {
+      lazy: () =>
+        import('./components/EntityConsecContent').then(
+          m => m.EntityConsecContent,
+        ),
+    },
+  }),
+);
+
+/** @public */
 export const ConsecPage = consecPlugin.provide(
   createRoutableExtension({
     name: 'ConsecPage',

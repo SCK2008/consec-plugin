@@ -1,101 +1,73 @@
+import React from 'react';
 import { Entity } from '@backstage/catalog-model';
 import { catalogApiRef, entityRouteRef } from '@backstage/plugin-catalog-react';
 import { TestApiProvider, renderInTestApp } from '@backstage/test-utils';
-import { screen } from '@testing-library/react';
-import { ConsecApi, ImageSummary, consecApiRef } from '../../api';
+import { screen, waitFor } from '@testing-library/react';
+import { consecApiRef } from '../../api';
+import { mockConsecApi, mockSummary } from '../../testUtils';
 import { ConsecPage } from './ConsecPage';
 
-const component = (name: string, ref?: string): Entity => ({
+const component = (name: string, ref: string): Entity => ({
   apiVersion: 'backstage.io/v1alpha1',
   kind: 'Component',
-  metadata: {
-    name,
-    annotations: ref ? { 'consec.io/image-ref': ref } : {},
-  },
-  relations: [],
+  metadata: { name, annotations: { 'consec.io/image-ref': ref } },
 });
 
-const summary = (gate: ImageSummary['gate'], critical = 0): ImageSummary => ({
-  imageId: 1,
-  reference: 'image',
-  gate,
-  status: 'completed',
-  critical,
-  high: 0,
-  medium: 0,
-  low: 0,
-  fixable: 0,
-  kev: 0,
-  secrets: 0,
-});
-
-const entities = [
-  component('pass-app', 'pass:1'),
-  component('fail-app', 'fail:1'),
-  component('plain-app'),
-  component('missing-app', 'missing:1'),
-  component('none-app', 'none:1'),
-  component('bad-app', 'bad:1'),
+const images = [
+  mockSummary({ imageId: 1, reference: 'ghcr.io/org/api:1', gate: 'fail' }),
+  mockSummary({ imageId: 2, reference: 'ghcr.io/org/orphan:2', gate: 'pass' }),
 ];
 
-function consecApi(): ConsecApi {
-  return {
-    getImageSummaries: async () => new Map(),
-    getImageSummary: async ref => {
-      if (ref === 'fail:1') return summary('fail', 4);
-      if (ref === 'pass:1') return summary('pass', 0);
-      if (ref === 'none:1') return summary('none');
-      if (ref === 'missing:1') return undefined;
-      throw new Error('lookup failed');
-    },
-  };
-}
-
-async function renderPage(
-  filter?: { kind: string },
-  getEntities = jest.fn(async () => ({ items: entities })),
-) {
-  const catalogApi = { getEntities };
+async function renderPage(listImages = jest.fn()) {
+  listImages.mockImplementation(async (query: any) =>
+    query?.limit === 1
+      ? { items: [], total: 42 }
+      : { items: images, total: images.length },
+  );
   await renderInTestApp(
     <TestApiProvider
       apis={[
-        [catalogApiRef, catalogApi],
-        [consecApiRef, consecApi()],
+        [
+          catalogApiRef,
+          {
+            getEntities: async () => ({
+              items: [component('api-service', 'ghcr.io/org/api:1')],
+            }),
+          },
+        ],
+        [consecApiRef, mockConsecApi({ listImages })],
       ]}
     >
-      <ConsecPage entitiesFilter={filter} />
+      <ConsecPage />
     </TestApiProvider>,
-    {
-      mountedRoutes: {
-        '/catalog/:namespace/:kind/:name': entityRouteRef,
-      },
-    },
+    { mountedRoutes: { '/catalog/:namespace/:kind/:name': entityRouteRef } },
   );
-  return getEntities;
+  return listImages;
 }
 
 describe('ConsecPage', () => {
-  it('lists annotated images and skips entities with no image', async () => {
-    const getEntities = await renderPage();
-    expect(getEntities).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: { kind: 'Component' } }),
+  it('lists every ConSec image, including ones no component declares', async () => {
+    const listImages = await renderPage();
+    expect(await screen.findByText('orphan:2')).toBeInTheDocument();
+    expect(screen.getByText('api:1')).toBeInTheDocument();
+    expect(screen.getByText('FAIL')).toBeInTheDocument();
+    expect(screen.getByText('PASS')).toBeInTheDocument();
+    expect(listImages).toHaveBeenCalledWith(
+      expect.objectContaining({ filter: 'all', sort: 'risk', limit: 20, offset: 0 }),
     );
-    expect(screen.getByText('fail-app')).toBeInTheDocument();
-    expect(screen.getByText('pass-app')).toBeInTheDocument();
-    expect(screen.queryByText('plain-app')).not.toBeInTheDocument();
-    expect(screen.getByText('Fail')).toBeInTheDocument();
-    expect(screen.getByText('Pass')).toBeInTheDocument();
-    expect(screen.getByText('Not scanned')).toBeInTheDocument();
-    expect(screen.getByText('Not evaluated')).toBeInTheDocument();
-    expect(screen.getByText('Error')).toBeInTheDocument();
-    const body = document.body.textContent ?? '';
-    expect(body.indexOf('fail-app')).toBeLessThan(body.indexOf('pass-app'));
   });
 
-  it('passes a custom catalog filter through', async () => {
-    const getEntities = await renderPage({ kind: 'Resource' });
-    expect(getEntities).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: { kind: 'Resource' } }),
+  it('links an image to the component that declares it', async () => {
+    await renderPage();
+    expect(await screen.findByText('api-service')).toBeInTheDocument();
+  });
+
+  it('shows totals for each filter', async () => {
+    await renderPage();
+    await waitFor(() =>
+      expect(screen.getAllByText('42').length).toBeGreaterThanOrEqual(5),
     );
+    expect(screen.getByText('Failing gate')).toBeInTheDocument();
+    expect(screen.getByText('Never scanned')).toBeInTheDocument();
   });
 });

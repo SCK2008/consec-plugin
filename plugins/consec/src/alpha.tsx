@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   ApiBlueprint,
   configApiRef,
@@ -6,9 +7,16 @@ import {
   fetchApiRef,
   PageBlueprint,
 } from '@backstage/frontend-plugin-api';
-import { EntityCardBlueprint } from '@backstage/plugin-catalog-react/alpha';
+import {
+  EntityCardBlueprint,
+  EntityContentBlueprint,
+} from '@backstage/plugin-catalog-react/alpha';
 import { ConsecClient, consecApiRef } from './api';
-import { CONSEC_IMAGE_REF_ANNOTATION, getImageRef } from './annotations';
+import {
+  CONSEC_IMAGE_REF_ANNOTATION,
+  getEntityImages,
+  isConsecAvailable,
+} from './annotations';
 
 const consecApi = ApiBlueprint.make({
   params: defineParams =>
@@ -41,15 +49,29 @@ const consecPage = PageBlueprint.make({
 export const consecEntityCard = EntityCardBlueprint.make({
   name: 'image',
   params: {
-    filter: entity => Boolean(getImageRef(entity)),
+    filter: entity => getEntityImages(entity).length > 0,
     loader: () => import('./components/ConsecCard').then(m => <m.ConsecCard />),
+  },
+});
+
+/** @public */
+export const consecEntityContent = EntityContentBlueprint.make({
+  name: 'images',
+  params: {
+    path: '/consec',
+    title: 'ConSec',
+    filter: isConsecAvailable,
+    loader: () =>
+      import('./components/EntityConsecContent').then(m => (
+        <m.EntityConsecContent />
+      )),
   },
 });
 
 /** @public */
 export default createFrontendPlugin({
   pluginId: 'consec',
-  extensions: [consecApi, consecPage, consecEntityCard],
+  extensions: [consecApi, consecPage, consecEntityCard, consecEntityContent],
   info: { packageJson: () => import('../package.json') },
 });
 

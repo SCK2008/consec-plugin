@@ -1,8 +1,10 @@
+import React from 'react';
 import { Entity } from '@backstage/catalog-model';
 import { EntityProvider } from '@backstage/plugin-catalog-react';
 import { TestApiProvider, renderInTestApp } from '@backstage/test-utils';
 import { screen } from '@testing-library/react';
-import { ConsecApi, ImageSummary, consecApiRef } from '../../api';
+import { ConsecApi, consecApiRef } from '../../api';
+import { mockConsecApi, mockSummary } from '../../testUtils';
 import { ConsecCard } from './ConsecCard';
 
 const entity = (ref?: string): Entity => ({
@@ -14,28 +16,9 @@ const entity = (ref?: string): Entity => ({
   },
 });
 
-const summary = (overrides: Partial<ImageSummary> = {}): ImageSummary => ({
-  imageId: 7,
-  reference: 'alpine:3.21',
-  gate: 'fail',
-  status: 'completed',
-  critical: 2,
-  high: 5,
-  medium: 1,
-  low: 0,
-  fixable: 4,
-  kev: 1,
-  secrets: 0,
-  lastCheckedAt: '2026-10-29T10:00:00Z',
-  url: 'https://consec.test/images/7',
-  ...overrides,
-});
+const summary = mockSummary;
 
-const api = (impl: Partial<ConsecApi>): ConsecApi => ({
-  getImageSummary: async () => undefined,
-  getImageSummaries: async () => new Map(),
-  ...impl,
-});
+const api = mockConsecApi;
 
 async function renderCard(consec: ConsecApi, ref?: string) {
   return renderInTestApp(

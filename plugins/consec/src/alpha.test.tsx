@@ -1,9 +1,11 @@
+import React from 'react';
 import { createExtensionTester } from '@backstage/frontend-test-utils';
 import { renderInTestApp, TestApiProvider } from '@backstage/test-utils';
 import { screen } from '@testing-library/react';
 import { EntityProvider } from '@backstage/plugin-catalog-react';
 import { Entity } from '@backstage/catalog-model';
 import { consecApiRef } from './api';
+import { mockConsecApi, mockSummary } from './testUtils';
 import { consecEntityCard } from './alpha';
 
 const entity: Entity = {
@@ -23,23 +25,7 @@ describe('new frontend system', () => {
         apis={[
           [
             consecApiRef,
-            {
-              getImageSummary: async () => ({
-                imageId: 7,
-                reference: 'alpine:3.21',
-                gate: 'fail' as const,
-                status: 'completed',
-                critical: 2,
-                high: 0,
-                medium: 0,
-                low: 0,
-                fixable: 1,
-                kev: 0,
-                secrets: 0,
-                url: 'https://consec.test/images/7',
-              }),
-              getImageSummaries: async () => new Map(),
-            },
+            mockConsecApi({ getImageSummary: async () => mockSummary() }),
           ],
         ]}
       >

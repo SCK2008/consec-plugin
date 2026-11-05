@@ -1,0 +1,1 @@
+export { EntityConsecContent } from './EntityConsecContent';
