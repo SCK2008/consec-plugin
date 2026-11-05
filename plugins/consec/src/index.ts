@@ -19,6 +19,7 @@ export type {
   ScanStatus,
   Vulnerability,
 } from './api';
+export { ConsecLogo } from './components/ConsecLogo';
 export {
   EntityConsecCard,
   EntityConsecContent,

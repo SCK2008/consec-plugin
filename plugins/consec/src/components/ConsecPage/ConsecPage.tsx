@@ -42,6 +42,7 @@ import {
   lastChecked,
   SEVERITY_COLORS,
 } from '../common';
+import { ConsecLogo } from '../ConsecLogo';
 import { ImagePanel } from '../ImagePanel';
 
 const useStyles = makeStyles(theme => ({
@@ -360,7 +361,14 @@ const ImageDetail = () => {
 export const ConsecPage = () => (
   <Page themeId="tool">
     <Header
-      title="ConSec"
+      title={
+        <Box display="inline-flex" alignItems="center">
+          <ConsecLogo fontSize="large" />
+          <Box component="span" ml={1}>
+            ConSec
+          </Box>
+        </Box>
+      }
       subtitle="Every container image scanned by ConSec@SK, with its gate verdict and vulnerabilities"
     />
     <Content>
