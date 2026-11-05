@@ -1,0 +1,1 @@
+export { ConsecPage } from './ConsecPage';
