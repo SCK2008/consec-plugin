@@ -1,4 +1,1 @@
-module.exports = {
-  root: true,
-  extends: ['@backstage/cli/config/eslint'],
-};
+module.exports = require('@backstage/cli/config/eslint-factory')(__dirname);

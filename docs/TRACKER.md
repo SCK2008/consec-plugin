@@ -17,10 +17,10 @@ Status values: `todo` · `in-progress` · `blocked` · `review` · `done`
 | 1 | Workspace scaffold + `getImageRef` | done | agent | Tests 3/3. Pinned to Pulse 1.54.3 |
 | 2 | `ConsecClient` + types | done | agent | 10 client tests. MSW 2, fetch called at request time |
 | 3 | `ConsecCard` | done | agent | 8 card tests. Gate, counts, link, missing annotation |
-| 4 | `ConsecPage` | todo | | |
-| 5 | Legacy wiring + dev harness | todo | | |
-| 6 | New frontend system `./alpha` | todo | | Uses `backstage.io@plugin-new-frontend-system-support` skill |
-| 7 | README, lint, API report | todo | | |
+| 4 | `ConsecPage` | done | agent | Failures first. One failed lookup stays on that row |
+| 5 | Legacy wiring + dev harness | done | agent | Card, page, dev app |
+| 6 | New frontend system `./alpha` | done | agent | API, page, annotated entity card |
+| 7 | README, lint, API report | done | agent | Lint clean. 25 tests |
 | 8 | Live verification on Kubernetes | blocked | Saurav | Waiting for K8s environment details |
 
 ## Review Focus checklist
@@ -30,7 +30,7 @@ Status values: `todo` · `in-progress` · `blocked` · `review` · `done`
 | Proxy not configured (404 HTML) → error, not "not scanned" | Task 2 | done |
 | Go zero time `last_checked_at` → "Never checked" | Tasks 2, 3 | done |
 | References with `/`, `:`, `@sha256:` encoded once | Task 2 | done |
-| One failing lookup doesn't break overview page | Task 4 | todo |
+| One failing lookup doesn't break overview page | Task 4 | done |
 | Whitespace-only annotation → missing-annotation state | Task 1 | done |
 
 ## Open questions
@@ -47,3 +47,4 @@ Status values: `todo` · `in-progress` · `blocked` · `review` · `done`
 - 2026-11-03: Task 1 done. `getImageRef` trims and rejects blank annotations. Yarn needed a local lockfile because `C:\Users\skalal\package.json` exists.
 - 2026-11-03: Task 2 done. Client maps lookup rows, treats JSON 404 as not scanned, and throws on HTML 404 and 401.
 - 2026-11-03: Task 3 done. Entity card shows gate, severity counts, and View in ConSec.
+- 2026-11-05: Tasks 4-7 done. Overview page, legacy plugin, new frontend system, README. Lint clean, 25 tests. Running Pulse and ConSec were not changed.
