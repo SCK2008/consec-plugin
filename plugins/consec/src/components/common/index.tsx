@@ -7,13 +7,35 @@ import { makeStyles, Theme } from '@material-ui/core/styles';
 import { DateTime } from 'luxon';
 import { Gate, ImageSummary } from '../../api';
 
+/** Chip fill per severity: critical red, high orange, medium yellow. */
 export const SEVERITY_COLORS: Record<string, string> = {
-  critical: '#8E1B1B',
-  high: '#D32F2F',
-  medium: '#ED6C02',
-  low: '#0277BD',
-  negligible: '#607D8B',
-  unknown: '#607D8B',
+  critical: '#C62828',
+  high: '#EF6C00',
+  medium: '#FBC02D',
+  low: '#1976D2',
+  negligible: '#78909C',
+  unknown: '#78909C',
+};
+
+/** Text on the chip fill; white fails contrast on yellow. */
+const SEVERITY_ON_COLORS: Record<string, string> = {
+  medium: '#3E2C00',
+};
+
+/** Plain-text count colours, darker so yellow stays readable on white. */
+export const SEVERITY_TEXT_COLORS: Record<string, string> = {
+  critical: '#C62828',
+  high: '#E65100',
+  medium: '#A67C00',
+  low: '#1565C0',
+};
+
+export const severityChipStyle = (severity: string): React.CSSProperties => {
+  const key = severity.toLowerCase();
+  return {
+    backgroundColor: SEVERITY_COLORS[key] ?? SEVERITY_COLORS.unknown,
+    color: SEVERITY_ON_COLORS[key] ?? '#FFFFFF',
+  };
 };
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -36,6 +58,20 @@ const useStyles = makeStyles((theme: Theme) => ({
     wordBreak: 'break-all',
   },
 }));
+
+/** Message from a Backstage ResponseError or a ConSec problem body. */
+export const errorMessage = (
+  error: unknown,
+  fallback = 'The scan could not be started',
+): string => {
+  const anyError = error as { body?: any; message?: string };
+  const detail =
+    anyError?.body?.error?.message ??
+    anyError?.body?.detail ??
+    anyError?.body?.error;
+  if (typeof detail === 'string' && detail) return detail;
+  return anyError?.message ?? fallback;
+};
 
 const RUNNING = new Set(['queued', 'running']);
 
@@ -67,7 +103,7 @@ export const GateChip = ({
           size="small"
           label="FAIL"
           className={classes.chip}
-          style={{ backgroundColor: SEVERITY_COLORS.high }}
+          style={{ backgroundColor: SEVERITY_COLORS.critical }}
         />
       </Tooltip>
     );
@@ -109,7 +145,7 @@ export const SeverityChip = ({
       size="small"
       label={label}
       className={`${classes.chip} ${count === 0 ? classes.zero : ''}`}
-      style={{ backgroundColor: SEVERITY_COLORS[key] ?? SEVERITY_COLORS.unknown }}
+      style={severityChipStyle(key)}
     />
   );
 };

@@ -2,7 +2,7 @@ import React from 'react';
 import { Entity } from '@backstage/catalog-model';
 import { EntityProvider } from '@backstage/plugin-catalog-react';
 import { TestApiProvider, renderInTestApp } from '@backstage/test-utils';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { consecApiRef } from '../../api';
 import { mockConsecApi, mockSummary } from '../../testUtils';
 import { EntityConsecContent } from './EntityConsecContent';
@@ -37,16 +37,22 @@ describe('EntityConsecContent', () => {
     );
     expect(screen.getAllByText(AMI_REF).length).toBeGreaterThan(0);
     expect(await screen.findByText('Not scanned yet')).toBeInTheDocument();
-    expect(screen.getAllByText('Not scanned').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Not scanned')).not.toBeInTheDocument();
   });
 
-  it('lists every annotated image with its gate', async () => {
+  it('shows header chips only while an image is collapsed', async () => {
     await render(
       entity({ 'consec.io/image-ref': 'ghcr.io/org/a:1, ghcr.io/org/b:2' }),
       async () => mockSummary() as any,
     );
     expect(screen.getAllByText('ghcr.io/org/a:1').length).toBeGreaterThan(0);
     expect(screen.getAllByText('ghcr.io/org/b:2').length).toBeGreaterThan(0);
+    // Both panels stay mounted. Only the collapsed second image adds header chips.
+    await waitFor(() => expect(screen.getAllByText('FAIL')).toHaveLength(3));
+    expect(screen.getAllByText('Critical 2')).toHaveLength(3);
+
+    fireEvent.click(screen.getByText('ghcr.io/org/a:1'));
+    await waitFor(() => expect(screen.getAllByText('FAIL')).toHaveLength(4));
   });
 
   it('explains how to add an image when none is known', async () => {

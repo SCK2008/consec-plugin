@@ -306,4 +306,104 @@ describe('ConsecClient', () => {
       status: 'running',
     });
   });
+
+  it('maps the remediation plan', async () => {
+    server.use(
+      http.get('http://backstage/api/proxy/consec/images/28/remediation', () =>
+        HttpResponse.json({
+          data: {
+            scan_id: 59,
+            summary: { os_update: 1, dependency_upgrade: 66, no_fix: 14, excepted: 0 },
+            os_update: {
+              packages: [
+                {
+                  name: 'musl-utils',
+                  current_version: '1.2.6-r2',
+                  type: 'apk',
+                  fixed_version: '1.2.6-r3',
+                  top_severity: 'unknown',
+                  kev: false,
+                  vuln_count: 1,
+                  vulns: [{ vuln_id: 'CVE-2026-107891' }],
+                  command: 'apk add --no-cache --upgrade musl-utils>=1.2.6-r3',
+                },
+              ],
+              combined_command: 'apk add --no-cache --upgrade musl-utils',
+            },
+            dependency_upgrade: { packages: [] },
+            no_fix: { packages: null },
+          },
+        }),
+      ),
+    );
+
+    const plan = await client().getRemediation(28);
+    expect(plan.summary).toEqual({ osUpdate: 1, dependencyUpgrade: 66, noFix: 14, excepted: 0 });
+    expect(plan.osUpdate.combinedCommand).toBe('apk add --no-cache --upgrade musl-utils');
+    expect(plan.osUpdate.packages[0]).toMatchObject({
+      name: 'musl-utils',
+      currentVersion: '1.2.6-r2',
+      fixedVersion: '1.2.6-r3',
+      vulnIds: ['CVE-2026-107891'],
+    });
+    expect(plan.noFix.packages).toEqual([]);
+  });
+
+  it('maps the threat model', async () => {
+    server.use(
+      http.get('http://backstage/api/proxy/consec/images/28/threat-model', () =>
+        HttpResponse.json({
+          data: {
+            scan_id: 59,
+            grade: 'B',
+            score: 81,
+            summary: '1 critical hardening issue(s)',
+            checks: [{ id: 'ports', title: 'Exposed ports', status: 'warn', detail: 'Exposes: 8090.' }],
+          },
+        }),
+      ),
+    );
+
+    await expect(client().getThreatModel(28)).resolves.toEqual({
+      scanId: 59,
+      grade: 'B',
+      score: 81,
+      summary: '1 critical hardening issue(s)',
+      checks: [{ id: 'ports', title: 'Exposed ports', status: 'warn', detail: 'Exposes: 8090.' }],
+    });
+  });
+
+  it('downloads an SBOM format through the read-only proxy', async () => {
+    let format: string | null = null;
+    server.use(
+      http.get('http://backstage/api/proxy/consec/images/28/sbom', ({ request }) => {
+        format = new URL(request.url).searchParams.get('format');
+        return new HttpResponse('<bom/>', { headers: { 'Content-Type': 'application/xml' } });
+      }),
+    );
+
+    const blob = await client().download(28, 'sbom', 'cyclonedx-xml');
+    expect(format).toBe('cyclonedx-xml');
+    expect(await blob.text()).toBe('<bom/>');
+  });
+
+  it('refuses formats ConSec does not serve', async () => {
+    await expect(client().download(28, 'report', 'pdf')).rejects.toThrow(
+      'Unsupported report format: pdf',
+    );
+  });
+
+  it('opens the fix through the consec backend and links the workspace', async () => {
+    server.use(
+      http.post('http://backstage/api/consec/images/28/fix', () =>
+        HttpResponse.json({ workspaceId: 12, created: false }),
+      ),
+    );
+
+    await expect(client('https://consec.test').fixImage(28)).resolves.toEqual({
+      workspaceId: 12,
+      created: false,
+      url: 'https://consec.test/kavach/workspaces/12',
+    });
+  });
 });

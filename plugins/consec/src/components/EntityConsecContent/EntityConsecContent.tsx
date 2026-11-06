@@ -124,7 +124,9 @@ export const EntityConsecContent = () => {
               <Box className={classes.ref}>
                 <ImageRef reference={image.reference} />
               </Box>
-              <HeaderStatus summary={summaries[image.reference]} />
+              {!isExpanded(image.reference, index) && (
+                <HeaderStatus summary={summaries[image.reference]} />
+              )}
             </Box>
           </AccordionSummary>
           <AccordionDetails className={classes.details}>

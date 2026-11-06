@@ -3,11 +3,17 @@ import { ResponseError } from '@backstage/errors';
 import pLimit from 'p-limit';
 import {
   ConsecApi,
+  DOWNLOAD_FORMATS,
+  FixWorkspace,
   ImageSummary,
   ListImagesQuery,
   ListVulnerabilitiesQuery,
   Page,
+  RemediationGroup,
+  RemediationPlan,
+  ReportKind,
   ScanStatus,
+  ThreatModel,
   Vulnerability,
 } from './ConsecApi';
 
@@ -56,6 +62,42 @@ type ScanRow = {
   scan_id: number;
   image_id: number;
   status: string;
+};
+
+type RemediationGroupRow = {
+  packages?: Array<{
+    name: string;
+    current_version: string;
+    type?: string | null;
+    fixed_version?: string | null;
+    top_severity: string;
+    kev: boolean;
+    vuln_count: number;
+    vulns?: Array<{ vuln_id: string }>;
+    command?: string | null;
+  }>;
+  combined_command?: string | null;
+};
+
+type RemediationRow = {
+  scan_id: number;
+  summary?: {
+    os_update?: number;
+    dependency_upgrade?: number;
+    no_fix?: number;
+    excepted?: number;
+  };
+  os_update?: RemediationGroupRow;
+  dependency_upgrade?: RemediationGroupRow;
+  no_fix?: RemediationGroupRow;
+};
+
+type ThreatRow = {
+  scan_id: number;
+  grade: string;
+  score: number;
+  summary: string;
+  checks?: Array<{ id: string; title: string; status: string; detail?: string }>;
 };
 
 type Envelope<T> = {
@@ -172,6 +214,78 @@ export class ConsecClient implements ConsecApi {
     return toScanStatus(body.data);
   }
 
+  async getRemediation(imageId: number): Promise<RemediationPlan> {
+    const response = await this.get(`/images/${imageSegment(imageId)}/remediation`);
+    const { data } = await this.json<Envelope<RemediationRow>>(response);
+    return {
+      scanId: data.scan_id,
+      summary: {
+        osUpdate: data.summary?.os_update ?? 0,
+        dependencyUpgrade: data.summary?.dependency_upgrade ?? 0,
+        noFix: data.summary?.no_fix ?? 0,
+        excepted: data.summary?.excepted ?? 0,
+      },
+      osUpdate: toGroup(data.os_update),
+      dependencyUpgrade: toGroup(data.dependency_upgrade),
+      noFix: toGroup(data.no_fix),
+    };
+  }
+
+  async getThreatModel(imageId: number): Promise<ThreatModel> {
+    const response = await this.get(`/images/${imageSegment(imageId)}/threat-model`);
+    const { data } = await this.json<Envelope<ThreatRow>>(response);
+    return {
+      scanId: data.scan_id,
+      grade: data.grade,
+      score: data.score,
+      summary: data.summary,
+      checks: (data.checks ?? []).map(check => ({
+        id: check.id,
+        title: check.title,
+        status: check.status,
+        detail: check.detail || undefined,
+      })),
+    };
+  }
+
+  async download(
+    imageId: number,
+    kind: ReportKind,
+    format: string,
+  ): Promise<Blob> {
+    const allowed = DOWNLOAD_FORMATS.some(
+      option => option.kind === kind && option.format === format,
+    );
+    if (!allowed) {
+      throw new Error(`Unsupported ${kind} format: ${format}`);
+    }
+    const response = await this.get(`/images/${imageSegment(imageId)}/${kind}`, {
+      format,
+    });
+    if (!response.ok) {
+      throw await ResponseError.fromResponse(response);
+    }
+    return response.blob();
+  }
+
+  async fixImage(imageId: number): Promise<FixWorkspace> {
+    const base = await this.discoveryApi.getBaseUrl('consec');
+    const response = await this.fetchApi.fetch(
+      `${base}/images/${imageSegment(imageId)}/fix`,
+      { method: 'POST' },
+    );
+    const result = await this.json<{ workspaceId: number; created: boolean }>(
+      response,
+    );
+    return {
+      workspaceId: result.workspaceId,
+      created: result.created,
+      url: this.baseUrl
+        ? `${this.baseUrl}/kavach/workspaces/${encodeURIComponent(String(result.workspaceId))}`
+        : undefined,
+    };
+  }
+
   private async get(
     path: string,
     params: Record<string, string | number | undefined> = {},
@@ -240,6 +354,27 @@ function toVulnerability(row: FindingRow): Vulnerability {
     description: row.description ?? undefined,
     dataSource: safeUrl(row.data_source),
     urls: splitList(row.urls).filter(url => safeUrl(url)),
+  };
+}
+
+function imageSegment(imageId: number): string {
+  return encodeURIComponent(String(imageId));
+}
+
+function toGroup(group?: RemediationGroupRow): RemediationGroup {
+  return {
+    packages: (group?.packages ?? []).map(pkg => ({
+      name: pkg.name,
+      currentVersion: pkg.current_version,
+      type: pkg.type ?? undefined,
+      fixedVersion: pkg.fixed_version ?? undefined,
+      topSeverity: pkg.top_severity,
+      kev: pkg.kev,
+      vulnCount: pkg.vuln_count,
+      vulnIds: (pkg.vulns ?? []).map(vuln => vuln.vuln_id),
+      command: pkg.command ?? undefined,
+    })),
+    combinedCommand: group?.combined_command ?? undefined,
   };
 }
 

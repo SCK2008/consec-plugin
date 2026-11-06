@@ -40,7 +40,7 @@ import {
   GateChip,
   ImageName,
   lastChecked,
-  SEVERITY_COLORS,
+  SEVERITY_TEXT_COLORS,
 } from '../common';
 import { ConsecLogo } from '../ConsecLogo';
 import { ImagePanel } from '../ImagePanel';
@@ -113,7 +113,7 @@ const Count = ({ value, severity }: { value: number; severity?: string }) => {
       variant="body2"
       className={classes.count}
       style={{
-        color: value > 0 && severity ? SEVERITY_COLORS[severity] : undefined,
+        color: value > 0 && severity ? SEVERITY_TEXT_COLORS[severity] : undefined,
         opacity: value === 0 ? 0.45 : 1,
       }}
     >

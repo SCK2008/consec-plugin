@@ -9,14 +9,18 @@ import Paper from '@material-ui/core/Paper';
 import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
+import Tab from '@material-ui/core/Tab';
+import Tabs from '@material-ui/core/Tabs';
 import AddIcon from '@material-ui/icons/Add';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import OpenInNewIcon from '@material-ui/icons/OpenInNew';
 import Alert from '@material-ui/lab/Alert';
+import useAsync from 'react-use/esm/useAsync';
 import useAsyncRetry from 'react-use/esm/useAsyncRetry';
 import { ImageSource } from '../../annotations';
 import { consecApiRef, ImageSummary } from '../../api';
 import {
+  errorMessage,
   GateChip,
   ImageRef,
   isScanInProgress,
@@ -24,6 +28,9 @@ import {
   SeverityCounts,
   statusLabel,
 } from '../common';
+import { FixOsButton, RemediationPanel } from '../RemediationPanel';
+import { ReportMenu } from '../ReportMenu';
+import { ThreatModelPanel } from '../ThreatModelPanel';
 import { VulnerabilityTable } from '../VulnerabilityTable';
 
 const POLL_MS = 5000;
@@ -43,7 +50,14 @@ const useStyles = makeStyles(theme => ({
   },
   grow: { flexGrow: 1, minWidth: 0 },
   meta: { marginTop: theme.spacing(0.5), marginBottom: theme.spacing(1.5) },
-  actions: { display: 'flex', gap: theme.spacing(1) },
+  actions: { display: 'flex', flexWrap: 'wrap', gap: theme.spacing(1) },
+  tabs: {
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    marginTop: theme.spacing(2),
+    marginBottom: theme.spacing(2),
+    minHeight: 40,
+  },
+  tab: { minHeight: 40, textTransform: 'none', fontWeight: 600 },
   empty: {
     padding: theme.spacing(4),
     textAlign: 'center',
@@ -53,15 +67,7 @@ const useStyles = makeStyles(theme => ({
   source: { height: 22 },
 }));
 
-export const errorMessage = (error: unknown): string => {
-  const anyError = error as { body?: any; message?: string };
-  const detail =
-    anyError?.body?.error?.message ??
-    anyError?.body?.detail ??
-    anyError?.body?.error;
-  if (typeof detail === 'string' && detail) return detail;
-  return anyError?.message ?? 'The scan could not be started';
-};
+type PanelTab = 'vulnerabilities' | 'remediation' | 'threat';
 
 export type ImagePanelProps = {
   reference: string;
@@ -99,6 +105,19 @@ export const ImagePanel = ({
   refresh.current = lookup.retry;
   const inProgress =
     queuedScanId !== undefined || isScanInProgress(summary?.status);
+  const [tab, setTab] = useState<PanelTab>('vulnerabilities');
+  const scanned = Boolean(summary?.lastCheckedAt);
+  const imageId = summary?.imageId;
+  const latestScanId = summary?.latestScanId;
+
+  const remediation = useAsync(async () => {
+    if (!scanned || imageId === undefined) return undefined;
+    try {
+      return await consec.getRemediation(imageId);
+    } catch {
+      return undefined;
+    }
+  }, [consec, scanned, imageId, latestScanId]);
 
   useEffect(() => {
     if (!lookup.loading && !lookup.error) onSummary?.(summary);
@@ -213,6 +232,11 @@ export const ImagePanel = ({
           )}
         </Box>
         <Box className={classes.actions}>
+          <FixOsButton
+            imageId={summary.imageId}
+            reference={summary.reference}
+            osUpdates={remediation.value?.summary.osUpdate}
+          />
           <Tooltip title="Pull the image again and run a fresh scan">
             <span>
               <Button
@@ -227,6 +251,7 @@ export const ImagePanel = ({
               </Button>
             </span>
           </Tooltip>
+          <ReportMenu imageId={summary.imageId} reference={summary.reference} />
           {summary.url && (
             <Button
               size="small"
@@ -272,11 +297,52 @@ export const ImagePanel = ({
       )}
       <SeverityCounts summary={summary} />
       {!hideVulnerabilities && (
-        <Box mt={2}>
-          <Paper variant="outlined">
-            <VulnerabilityTable imageId={summary.imageId} />
-          </Paper>
-        </Box>
+        <>
+          <Tabs
+            value={tab}
+            onChange={(_event, value: PanelTab) => setTab(value)}
+            indicatorColor="primary"
+            textColor="primary"
+            className={classes.tabs}
+            aria-label="Image details"
+          >
+            <Tab
+              value="vulnerabilities"
+              label={`Vulnerabilities (${summary.total})`}
+              className={classes.tab}
+            />
+            <Tab
+              value="remediation"
+              label={`Remediation (${summary.fixable} fixable)`}
+              className={classes.tab}
+            />
+            <Tab value="threat" label="Threat model" className={classes.tab} />
+          </Tabs>
+          {tab === 'vulnerabilities' && (
+            <Paper variant="outlined">
+              <VulnerabilityTable imageId={summary.imageId} />
+            </Paper>
+          )}
+          {tab === 'remediation' && remediation.loading && <Progress />}
+          {tab === 'remediation' && !remediation.loading && remediation.value && (
+            <RemediationPanel
+              imageId={summary.imageId}
+              reference={summary.reference}
+              plan={remediation.value}
+            />
+          )}
+          {tab === 'remediation' && !remediation.loading && !remediation.value && (
+            <Alert severity="info">
+              No remediation plan yet. It appears after a scan completes.
+            </Alert>
+          )}
+          {tab === 'threat' && (
+            <ThreatModelPanel
+              key={summary.latestScanId}
+              imageId={summary.imageId}
+            />
+          )}
+        </>
       )}
     </Box>
   );
